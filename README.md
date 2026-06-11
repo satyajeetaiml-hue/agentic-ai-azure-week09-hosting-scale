@@ -2,103 +2,65 @@
 
 [![CI](https://github.com/satyajeetaiml-hue/agentic-ai-azure-week09-hosting-scale/actions/workflows/ci.yml/badge.svg)](https://github.com/satyajeetaiml-hue/agentic-ai-azure-week09-hosting-scale/actions/workflows/ci.yml)
 
-> **Standalone lab** from the *Agentic AI on Azure — Enterprise Master Class* (12 weeks).
-> Each lab is an independent, runnable FastAPI starter. Part of the
-> [course series](https://github.com/satyajeetaiml-hue?tab=repositories&q=agentic-ai-azure).
+> **Standalone lab** from the *Agentic AI on Azure — Enterprise Master Class*.
+> Course hub: [azure-agentic-ai-masterclass](https://github.com/satyajeetaiml-hue/azure-agentic-ai-masterclass).
 
 ---
 
 ## 🎯 Learning goal
-Package and deploy agents for production scale on Azure compute substrates.
+Package and deploy agents for production scale, with **durable long-running tasks** and **status polling**.
 
 ## 🏢 Enterprise use case — "Black-Friday Customer Service Swarm" (Retail / E-commerce)
-A fleet of customer-service agents must scale from 10 to 10,000 concurrent sessions, scale to zero overnight, and stay within cost guardrails — with durable long-running tasks for refunds.
+A fleet of CS agents scales from 10 to 10,000 sessions, scales to zero overnight, and runs durable
+**refund** tasks without blocking the request path.
 
----
-
-## 🧪 What you'll build (lab)
-1. Containerize the FastAPI agent app with **Docker**.
-2. Deploy to **Azure Container Apps** with autoscaling (KEDA, scale-to-zero).
-3. Add **Durable Tasks** for long-running operations (refunds).
-4. Compare deploy targets: Container Apps vs. **AKS** vs. **Azure Functions**.
-
-> This starter ships with a **runnable mock** of the endpoint so you can run and test
-> immediately, then progressively replace the mock with the real Azure implementation.
-
-## 🏗️ Architect's lens
-- Decision matrix: Container Apps (managed, event-driven, scale-to-zero) vs. AKS (max control) vs. Functions (bursty).
-- Concurrency model: async FastAPI + uvicorn/gunicorn workers; connection pooling to models.
-- Cost: token budgets, model routing (small model for triage, large for hard cases), caching.
-
-## 🧰 Tech stack
-Docker, Azure Container Apps (+ KEDA), AKS, Azure Functions, Azure Container Registry, FastAPI + Gunicorn/Uvicorn, Bicep/Terraform.
-
----
+## ✅ What this repo implements
+- **Fast path** — FAQ-style messages answer inline.
+- **Durable path** — refunds spawn a background task (FastAPI `BackgroundTasks`; **Durable Functions /
+  Durable Tasks** in prod) with a pollable status at `GET /api/v1/tasks/{id}`.
+- **Scale knobs** at `GET /api/v1/scale` (the signals KEDA uses).
+- **Dockerfile + Gunicorn/Uvicorn** for the Container Apps deploy story.
 
 ## 🚀 Quick start
-
 ```bash
-# 1. Create & activate a virtual environment
-python -m venv .venv
-# Windows (PowerShell):
-.\.venv\Scripts\Activate.ps1
-# macOS/Linux:
-# source .venv/bin/activate
-
-# 2. Install dependencies
+python -m venv .venv && .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-
-# 3. (Optional) copy the env template — runs in MOCK mode without it
-copy .env.example .env        # Windows
-# cp .env.example .env        # macOS/Linux
-
-# 4. Run the API
 uvicorn app.main:app --reload
 ```
-
-Open the interactive docs at **http://127.0.0.1:8000/docs**.
-
-### Try the endpoint
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/support \
   -H "Content-Type: application/json" \
   -d '{"customer_message": "I want a refund for order #88231, it arrived damaged."}'
+# -> {"kind":"task","task_id":"TASK-...","state":"processing"}  then poll:
+curl http://127.0.0.1:8000/api/v1/tasks/<task_id>
 ```
+Run tests: `pytest -q`
 
-### Run the tests
+## 🐳 Deploy (Container Apps)
 ```bash
-pytest -q
+docker build -t cs-swarm .
+docker run -p 8000:8000 cs-swarm        # CMD uses gunicorn + uvicorn workers
 ```
+Then push to ACR and deploy to **Azure Container Apps** with KEDA (scale-to-zero). Compare targets:
 
-### Run with Docker
-```bash
-docker build -t agentic-ai-azure-week09-hosting-scale .
-docker run -p 8000:8000 agentic-ai-azure-week09-hosting-scale
-```
+| | Container Apps | AKS | Functions |
+|--|----------------|-----|-----------|
+| Best for | most agent APIs | platform control | bursty/short |
+| Scaling | KEDA, scale-to-zero | HPA/KEDA (you manage) | per-execution |
+| Ops burden | low | high | lowest |
 
----
+## 🏗️ Architect's lens
+- Decision matrix above — **Container Apps is the course default**.
+- Async FastAPI + Gunicorn/Uvicorn workers; connection pooling to models.
+- Cost: token budgets, model routing (small for triage, large for hard cases), caching.
 
-## 📁 Project structure
-```
-agentic-ai-azure-week09-hosting-scale/
-├── app/
-│   ├── __init__.py
-│   └── main.py          # FastAPI app + the /api/v1/support endpoint
-├── tests/
-│   └── test_smoke.py
-├── requirements.txt
-├── Dockerfile
-├── .env.example
-├── .gitignore
-└── README.md
-```
+## 🧰 Tech stack
+Docker, Azure Container Apps (+KEDA), AKS, Azure Functions, ACR, FastAPI + Gunicorn/Uvicorn, Bicep/Terraform.
 
----
-
-## 🗺️ Where this fits
-This repo covers **Week 9 — Hosting, Deployment & Scale**. The full 12-week path and reference architecture
-live in the master-class companion repo:
-**[azure-agentic-ai-masterclass](https://github.com/satyajeetaiml-hue/azure-agentic-ai-masterclass)**.
+## 🗺️ Series
+Prev: [Week 8](https://github.com/satyajeetaiml-hue/agentic-ai-azure-week08-rag-grounding) ·
+Next: [Week 10 — Observability](https://github.com/satyajeetaiml-hue/agentic-ai-azure-week10-observability) ·
+[All labs](https://github.com/satyajeetaiml-hue?tab=repositories&q=agentic-ai-azure)
 
 ## 📄 License
 MIT — see [`LICENSE`](LICENSE).
